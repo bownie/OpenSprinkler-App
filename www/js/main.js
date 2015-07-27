@@ -1580,6 +1580,13 @@ var showSites = ( function() {
 										( typeof b.auth_user !== "undefined" && typeof b.auth_pw !== "undefined" ? " checked='checked'" : "" ) + ">" +
 									_( "Use Auth" ) +
 								"</label>" +
+                                "<div class='ui-field-contain'>" +
+                                    "<button data-helptext='" + _( "Use this field to enter a Gateway ID for connection to HBWT CloudSensor." ) +
+                                     "' class='collapsible-button-right help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+                                    "<label for='csgwid-" + i + "'>" + _( "CloudSensor Gateway ID" ) + "</label>" + 
+                                    "<input id='csgwid-" + i + "' type='url' value='" + b.cs_gw_id +
+                                    "' autocomplete='off' autocorrect='off' autocapitalize='off' pattern='' spellcheck='false'>" + 
+                                "</div>" +
 	                        "</fieldset>" +
 	                        "<input class='submit' type='submit' value='" + _( "Save Changes to" ) + " " + a + "'>" +
 	                        "<a data-role='button' class='deletesite' data-site='" + i + "' href='#' data-theme='b'>" + _( "Delete" ) + " " + a + "</a>" +
@@ -1657,6 +1664,7 @@ var showSites = ( function() {
 	                    ip = list.find( "#cip-" + id ).val(),
 	                    pw = list.find( "#cpw-" + id ).val(),
 	                    nm = list.find( "#cnm-" + id ).val(),
+	                    csgwid = list.find( "#csgwid-" + id ).val(),
 	                    useauth = list.find( "#useauth-" + id ).is( ":checked" ),
 	                    usessl = list.find( "#usessl-" + id ).is( ":checked" ) ? "1" : undefined,
 	                    authUser = list.find( "#useauth-" + id ).data( "user" ),
@@ -1687,6 +1695,13 @@ var showSites = ( function() {
 	                if ( ip !== "" && ip !== sites[site].os_ip ) {
 	                    sites[site].os_ip = ip;
 	                }
+
+	                // Store the CloduSensor gateway id
+	                //
+	                if ( csgwid !== "" && csgwid !== sites[site].cs_gw_id ) {
+	                    sites[site].cs_gw_id = csgwid;
+	                }
+
 	                if ( pw !== "" && pw !== sites[site].os_pw ) {
 	                    if ( isMD5( sites[site].os_pw ) ) {
 	                        pw = md5( pw );
