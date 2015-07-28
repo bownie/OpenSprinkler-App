@@ -95,7 +95,7 @@ var isIEMobile = /IEMobile/.test( navigator.userAgent ),
     // Array to hold all notifications currently displayed within the app
     notifications = [],
     timers = {},
-    curr183, currIp, currPrefix, currAuth, currPass, currPiWeather, currAuthUser,
+    curr183, currIp, currPrefix, currAuth, currPass, currPiWeather, currAuthUser, currCloudSensorGW,
     currAuthPass, currLocal, currLang, language, deviceip, errorTimeout, weather, weatherKeyFail, openPanel;
 
 // Redirect jQuery Mobile DOM manipulation to prevent error
@@ -542,6 +542,131 @@ function flipSwitched() {
     } );
 }
 
+
+// Fetch from CloudSensor
+//
+function updateCloudSensor(callback) {
+
+    callback = callback || function() {};
+
+    console.log("Starting fetch")
+    return sendToCS( "100001" ).done( function( sensors ) {
+        console.log(sensors);
+
+        console.log("Sensors returned = " + sensors.no);
+
+        for ( var i = 0; i < sensors.no; i++ ) {
+          console.log(sensors.records[i]);
+        }
+
+        //controller.stations = stations;
+        callback();
+    } );
+}
+
+// Wrapper function to communicate with CloudSensor
+//
+function sendToCS(gatewayId , type ) {
+
+    var cloudSensorPrefix = "http://"
+    var cloudSensorIp = "cloudsensor.webfactional.com/HBwater/default/detail.json?gw="
+    //var cloudSensorIp = "cloudsensor.webfactional.com/HBwater/default/detail.json?gw=100001&no=50"
+
+    var queue = "default";  // or "change"?
+
+    // Create a binding object
+    //
+    var obj = {
+            url: cloudSensorPrefix + cloudSensorIp + gatewayId + "&no=50", // and limit to 50
+
+            // Use POST or GET
+            //
+            type: "GET",
+            dataType: type,
+            shouldRetry: function( xhr, current ) {
+                if ( xhr.status === 0 && xhr.statusText === "abort" || retryCount < current ) {
+                    $.ajaxq.abort( queue );
+                    return false;
+                }
+                return true;
+            }
+        },
+        defer;
+
+
+    console.log("Url to fetch = " + obj.url);
+
+    // Now fetch using obj descriptor
+    //
+    defer = $.ajaxq( queue, obj ).then(
+        function( data ) {
+
+            // In case the data type was incorrect, attempt to fix.
+            // If fix not possible, return string
+            if ( typeof data === "string" ) {
+                try {
+                    data = $.parseJSON( data );
+                } catch ( e ) {
+                    return data;
+                }
+            }
+
+            // Don't need to handle this situation for OSPi or firmware below 2.1.0
+            if ( typeof data !== "object" || typeof data.result !== "number" ) {
+                return data;
+            }
+
+            // Return as successful
+            if ( data.result === 1 ) {
+                return data;
+
+            // Handle incorrect password
+            } else if ( data.result === 2 ) {
+                if ( /\/(?:cv|cs|cr|cp|uwa|dp|co|cl|cu|up|cm)/.exec( gatewayId ) ) {
+                    showerror( _( "Check device password and try again." ) );
+                }
+
+                // Tell subsequent handlers this request has failed (use 401 to prevent retry)
+                return $.Deferred().reject( { "status":401 } );
+
+            // Handle page not found by triggering fail
+            } else if ( data.result === 32 ) {
+
+                return $.Deferred().reject( { "status":404 } );
+            }
+
+            // Only show error messages on setting change requests
+            if ( /\/(?:cv|cs|cr|cp|uwa|dp|co|cl|cu|up|cm)/.exec( gatewayId ) ) {
+                if ( data.result === 48 ) {
+                    showerror(
+						_( "The selected station is already running or is scheduled to run." )
+                    );
+                } else {
+                    showerror( _( "Please check input and try again." ) );
+                }
+
+                // Tell subsequent handlers this request has failed
+                return $.Deferred().reject( data );
+            }
+
+        },
+        function( e ) {
+            if ( ( e.statusText === "timeout" || e.status === 0 ) && /\/(?:cv|cs|cr|cp|uwa|dp|co|cl|cu|cm)/.exec( gatewayId ) ) {
+
+                // Handle the connection timing out but only show error on setting change
+                showerror( _( "Connection timed-out. Please try again." ) );
+            } else if ( e.status === 401 ) {
+
+                //Handle unauthorized requests
+                showerror( _( "Check device password and try again." ) );
+            }
+            return;
+        }
+    );
+
+    return defer;
+}
+
 // Wrapper function to communicate with OpenSprinkler
 function sendToOS( dest, type ) {
 
@@ -820,7 +945,8 @@ function updateController( callback, fail ) {
         updateControllerStations(),
         updateControllerOptions(),
         updateControllerStatus(),
-        updateControllerSettings()
+        updateControllerSettings(),
+        updateCloudSensor()
     ).then( function() {
         $( "html" ).trigger( "datarefresh" );
         checkStatus();
@@ -1092,6 +1218,7 @@ function checkConfigured( firstLoad ) {
 
         currIp = sites[current].os_ip;
         currPass = sites[current].os_pw;
+	currCloudSensorGW = sites[current].cw_gw_id;
 
         if ( typeof sites[current].ssl !== "undefined" && sites[current].ssl === "1" ) {
             currPrefix = "https://";
@@ -1584,7 +1711,7 @@ var showSites = ( function() {
                                     "<button data-helptext='" + _( "Use this field to enter a Gateway ID for connection to HBWT CloudSensor." ) +
                                      "' class='collapsible-button-right help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
                                     "<label for='csgwid-" + i + "'>" + _( "CloudSensor Gateway ID" ) + "</label>" + 
-                                    "<input id='csgwid-" + i + "' type='url' value='" + b.cs_gw_id +
+                                    "<input id='csgwid-" + i + "' type='url' value='" + ( b.cs_gw_id == undefined ? "" : b.cs_gw_id ) +
                                     "' autocomplete='off' autocorrect='off' autocapitalize='off' pattern='' spellcheck='false'>" + 
                                 "</div>" +
 	                        "</fieldset>" +
@@ -1696,7 +1823,7 @@ var showSites = ( function() {
 	                    sites[site].os_ip = ip;
 	                }
 
-	                // Store the CloduSensor gateway id
+	                // Store the CloudSensor gateway id
 	                //
 	                if ( csgwid !== "" && csgwid !== sites[site].cs_gw_id ) {
 	                    sites[site].cs_gw_id = csgwid;
@@ -2378,8 +2505,7 @@ function showAdjustmentOptions( button, callback ) {
     popup.on( "focus", "input[type='number']", function() {
         this.value = "";
     } ).on( "blur", "input[type='number']", function() {
-        if ( this.value === "" || parseInt( this.value ) < 0 ) {
-            this.value = "0";
+        if ( this.value === "" || parseInt( this.value ) < 0 ) { this.value = "0";
         }
     } );
 
@@ -4286,6 +4412,9 @@ var showHome = ( function() {
                             "<div class='sitename bold'></div>" +
                             "<div id='clock-s' class='nobr'></div>" +
                             _( "Water Level" ) + ": <span class='waterlevel'></span>%" +
+                        "</div>" +
+                        "<div class='ui-block-b center home-info pointer'>" +
+                            _( "CloudSensor ID" ) + ": <span class='cloudsensorid'></span>" +
                         "</div>" +
                     "</div>" +
                     "<div id='os-running-stations'></div>" +
@@ -8468,6 +8597,64 @@ function requestCloudAuth( callback ) {
 
     openPopup( popup );
 }
+
+
+function cloudSensorGetSites(callback) {
+    callback = callback || function() {};
+
+    storage.get( [ "cloudToken", "cloudDataToken" ], function( local ) {
+        if ( local.cloudToken === undefined || local.cloudToken === null ) {
+            callback( false );
+            return;
+        }
+
+        if ( local.cloudDataToken === undefined || local.cloudDataToken === null ) {
+            handleInvalidDataToken();
+            callback( false );
+            return;
+        }
+
+        $.ajax( {
+            type: "POST",
+            dataType: "json",
+            url: "http://cloudsensor.webfactional.com/HBwater/default/detail.json?gw=100001&no=50",
+            data: {
+                action: "getSites",
+                token: local.cloudToken
+            },
+            success: function( data ) {
+                if ( data.success === false || data.sites === "" ) {
+                    if ( data.message === "BAD_TOKEN" ) {
+                        handleExpiredLogin();
+                    }
+                    callback( false, data.message );
+                } else {
+                    storage.set( { "cloudToken":data.token } );
+                    var sites;
+
+                    try {
+                        sites = sjcl.decrypt( local.cloudDataToken, data.sites );
+                    } catch ( err ) {
+                        if ( err.message === "ccm: tag doesn't match" ) {
+                            handleInvalidDataToken();
+                        }
+                        callback( false );
+                    }
+
+                    try {
+                        callback( JSON.parse( sites ) );
+                    } catch ( err ) {
+                        callback( false );
+                    }
+                }
+            },
+            fail: function() {
+                callback( false );
+            }
+        } );
+    } );
+}
+
 
 function cloudLogin( user, pass, callback ) {
     callback = callback || function() {};
