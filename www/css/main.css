@@ -740,6 +740,24 @@ body, input, select, textarea, button, .ui-btn {
 .station-status.off:after {
     background-color:#C96161;
 }
+
+.moisture-level {
+    position: absolute;
+    top: -3px;
+    left: 8%;
+    border: none;
+}
+
+.moisture-level.low:after {
+    background-color:#aaaacc;
+}
+.moisture-level.med:after {
+    background-color:#7777cc;
+}
+.moisture-level.high:after {
+    background-color:#1111ff;
+}
+
 #os-stations-list img, #os-running-stations img {
 	display: none;
 }

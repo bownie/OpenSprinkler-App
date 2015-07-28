@@ -549,17 +549,56 @@ function updateCloudSensor(callback) {
 
     callback = callback || function() {};
 
-    console.log("Starting fetch")
-    return sendToCS( "100001" ).done( function( sensors ) {
-        console.log(sensors);
+/*
+    // Need to get this working to fetch current site and associated cloudsensor value
+    //
+    if ( currCloudSensorGW == undefined ) {
 
-        console.log("Sensors returned = " + sensors.no);
+      siteSelect = $( "#site-selector" );
+      console.log("Current site = " + siteSelect.val());
 
-        for ( var i = 0; i < sensors.no; i++ ) {
-          console.log(sensors.records[i]);
+      storage.get( "sites", function( data ) {
+          var sites = parseSites( data.sites );
+          console.log("SITE = " + sites);
+          console.log("Current site = " + data.current_site);
+      } );
+
+      //var sites = parseSites( data.sites );
+      //console.log("Current site = " + data.current_site);
+      //console.log(data.sites);
+
+      console.log("No cloudsensor gateway defined");
+      return;
+    }
+*/
+
+    console.log("Starting fetch for GW " + currCloudSensorGW)
+
+
+    return sendToCS( "100001" ).done( function( gateway ) {
+    //return sendToCS( currCloudSensorGW ).done( function( gateway ) {
+
+        // Show all gateways
+        //
+        //console.log(gateway);
+
+        console.log("Gateway records returned = " + gateway.no);
+
+        // Fetch all of the values
+        //
+/*
+        for ( var i = 0; i < gateway.no; i++ ) {
+          console.log(gateway.records[i]);
+          console.log("Sensor ID = " + gateway.records[i].id + 
+                      ", updated = " + gateway.records[i].updated + 
+                      ", s1 = " + gateway.records[i].s1);
         }
+*/
 
-        //controller.stations = stations;
+        console.log("Latest Sensor ID = " + gateway.records[0].id + 
+                      ", updated = " + gateway.records[0].updated + 
+                      ", s1 = " + gateway.records[0].s1);
+
         callback();
     } );
 }
@@ -1218,7 +1257,6 @@ function checkConfigured( firstLoad ) {
 
         currIp = sites[current].os_ip;
         currPass = sites[current].os_pw;
-	currCloudSensorGW = sites[current].cw_gw_id;
 
         if ( typeof sites[current].ssl !== "undefined" && sites[current].ssl === "1" ) {
             currPrefix = "https://";
@@ -1826,7 +1864,11 @@ var showSites = ( function() {
 	                // Store the CloudSensor gateway id
 	                //
 	                if ( csgwid !== "" && csgwid !== sites[site].cs_gw_id ) {
+
+                            console.log("Setting sites[site].cs_gw_id = " + csgwid);
+
 	                    sites[site].cs_gw_id = csgwid;
+	                    currCloudSensorGW = csgwid;
 	                }
 
 	                if ( pw !== "" && pw !== sites[site].os_pw ) {
@@ -4441,7 +4483,12 @@ var showHome = ( function() {
                 isRunning = controller.status[i] > 0,
                 pname = isScheduled ? pidname( controller.settings.ps[i][0] ) : "",
                 rem = controller.settings.ps[i][1],
-                hasImage = sites[currentSite].images[i] ? true : false;
+                hasImage = sites[currentSite].images[i] ? true : false,
+                moistureLevel = "low";
+
+            // Fetch moisture level and reset image accordingly
+            //
+            //if (controller.
 
             if ( controller.status[i] && rem > 0 ) {
                 addTimer( i, rem );
@@ -4455,10 +4502,19 @@ var showHome = ( function() {
 
 			cards += "<img src='" + ( hasImage ? "data:image/jpeg;base64," + sites[currentSite].images[i] : emptyImage ) + "' />";
 
+            // Station name
+            //
             cards += "<p class='tight center inline-icon' id='station_" + i + "'>" + station + "</p>";
 
+            // This is the running status
+            //
             cards += "<span class='btn-no-border ui-btn ui-btn-icon-notext ui-corner-all station-status " +
 				( isRunning ? "on" : ( isScheduled ? "wait" : "off" ) ) + "'></span>";
+
+            // Add a moisture level indicator
+            //
+            cards += "<span class='btn-no-border ui-btn ui-btn-icon-notext ui-corner-all moisture-level " +
+				moistureLevel + "'></span>";
 
             cards += "<span class='btn-no-border ui-btn " + ( ( isStationMaster( i ) ) ? "ui-icon-master" : "ui-icon-gear" ) +
 				" ui-btn-icon-notext station-settings' data-station='" + i + "' id='attrib-" + i + "' " +
