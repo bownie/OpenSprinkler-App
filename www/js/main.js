@@ -582,7 +582,7 @@ function updateCloudSensor(callback) {
 
     var siteSelect = $( "#site-selector" );
     var currentSite = getCurrentSite(siteSelect.val());
-    if (currentSite == undefined)
+    if (currentSite == undefined || currentSite.cs_gw_id == undefined)
     {
       console.log("updateCloudSensor - couldn't find site id " + siteSelect.val());
       return;
@@ -590,6 +590,11 @@ function updateCloudSensor(callback) {
 
     console.log("Moisture levels = " + moistureLevels);
     console.log("Starting fetch for GW " + siteSelect.val() + " with CloudSensor ID = " + currentSite.cs_gw_id);
+
+    if (currentSite.cs_gw_id == "") {
+        console.log("Skipping empty cloudsensor gateway id");
+        return;
+    }
 
     return sendToCS( currentSite.cs_gw_id ).done( function( gateway ) {
 
