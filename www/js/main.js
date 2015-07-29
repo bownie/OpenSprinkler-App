@@ -543,61 +543,73 @@ function flipSwitched() {
 }
 
 
+// Return site details for a name
+//
+function getCurrentSite(siteName) {
+
+    var rS = null;
+
+    storage.get( "sites", function( data ) {
+        var sites = parseSites( data.sites );
+        //console.log("SITE = " + sites);
+        //console.log("Current site = " + data.current_site);
+
+        sites = sortObj( sites );
+
+        $.each( sites, function( a, b ) {
+          //console.log("Site " + a + " gateway id = " + b.cs_gw_id);
+          if (a == siteName) {
+            //console.log("FOUND MATCH SITE " + a);
+            rS = b;
+          }
+        });
+    } );
+
+    return rS;
+}
+
 // Fetch from CloudSensor
 //
 function updateCloudSensor(callback) {
 
     callback = callback || function() {};
 
-/*
-    // Need to get this working to fetch current site and associated cloudsensor value
-    //
-    if ( currCloudSensorGW == undefined ) {
-
-      siteSelect = $( "#site-selector" );
-      console.log("Current site = " + siteSelect.val());
-
-      storage.get( "sites", function( data ) {
-          var sites = parseSites( data.sites );
-          console.log("SITE = " + sites);
-          console.log("Current site = " + data.current_site);
-      } );
-
-      //var sites = parseSites( data.sites );
-      //console.log("Current site = " + data.current_site);
-      //console.log(data.sites);
-
-      console.log("No cloudsensor gateway defined");
+    var siteSelect = $( "#site-selector" );
+    var currentSite = getCurrentSite(siteSelect.val());
+    if (currentSite == undefined)
+    {
+      console.log("updateCloudSensor - couldn't find site id " + siteSelect.val());
       return;
-    }
-*/
+    } 
 
-    console.log("Starting fetch for GW " + currCloudSensorGW)
+    console.log("Starting fetch for GW " + siteSelect.val() + " with CloudSensor ID = " + currentSite.cs_gw_id);
 
-
-    return sendToCS( "100001" ).done( function( gateway ) {
-    //return sendToCS( currCloudSensorGW ).done( function( gateway ) {
+    return sendToCS( currentSite.cs_gw_id ).done( function( gateway ) {
 
         // Show all gateways
         //
         //console.log(gateway);
-
-        console.log("Gateway records returned = " + gateway.no);
-
-        // Fetch all of the values
+        
+        // Check to see if we have values
         //
+        if (gateway.records[0] != undefined) {
+          console.log("Gateway records returned = " + gateway.no);
+
+          // Fetch all of the values
+          //
 /*
-        for ( var i = 0; i < gateway.no; i++ ) {
-          console.log(gateway.records[i]);
-          console.log("Sensor ID = " + gateway.records[i].id + 
-                      ", updated = " + gateway.records[i].updated + 
-                      ", s1 = " + gateway.records[i].s1);
-        }
+          for ( var i = 0; i < gateway.no; i++ ) {
+            console.log(gateway.records[i]);
+            console.log("Sensor ID = " + gateway.records[i].id + 
+                        ", updated = " + gateway.records[i].updated + 
+                        ", s1 = " + gateway.records[i].s1);
+          }
 */
 
-        console.log("Latest Sensor ID = " + gateway.records[0].id + 
-                      ", updated = " + gateway.records[0].updated + 
-                      ", s1 = " + gateway.records[0].s1);
+          console.log("Latest Sensor ID = " + gateway.records[0].id + 
+                        ", updated = " + gateway.records[0].updated + 
+                        ", s1 = " + gateway.records[0].s1);
+        }
 
         callback();
     } );
@@ -8675,7 +8687,7 @@ function cloudSensorGetSites(callback) {
             dataType: "json",
             url: "http://cloudsensor.webfactional.com/HBwater/default/detail.json?gw=100001&no=50",
             data: {
-                action: "getSites",
+                action: "getGateway",
                 token: local.cloudToken
             },
             success: function( data ) {
