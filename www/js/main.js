@@ -91,6 +91,7 @@ var isIEMobile = /IEMobile/.test( navigator.userAgent ),
     controller = {},
     switching = false,
     currentCoordinates = [ 0, 0 ],
+    moistureLevels = [],
 
     // Array to hold all notifications currently displayed within the app
     notifications = [],
@@ -574,6 +575,11 @@ function updateCloudSensor(callback) {
 
     callback = callback || function() {};
 
+    // Reset array
+    //
+    //moistureLevels = [];
+    moistureLevels.splice(0, moistureLevels.length);
+
     var siteSelect = $( "#site-selector" );
     var currentSite = getCurrentSite(siteSelect.val());
     if (currentSite == undefined)
@@ -582,6 +588,7 @@ function updateCloudSensor(callback) {
       return;
     } 
 
+    console.log("Moisture levels = " + moistureLevels);
     console.log("Starting fetch for GW " + siteSelect.val() + " with CloudSensor ID = " + currentSite.cs_gw_id);
 
     return sendToCS( currentSite.cs_gw_id ).done( function( gateway ) {
@@ -594,6 +601,8 @@ function updateCloudSensor(callback) {
         //
         if (gateway.records[0] != undefined) {
           console.log("Gateway records returned = " + gateway.no);
+
+          var latestRecord = gateway.records[0];
 
           // Fetch all of the values
           //
@@ -609,6 +618,20 @@ function updateCloudSensor(callback) {
           console.log("Latest Sensor ID = " + gateway.records[0].id + 
                         ", updated = " + gateway.records[0].updated + 
                         ", s1 = " + gateway.records[0].s1);
+
+          // Set moisture level selectors accordingly
+          //
+          if (latestRecord.s1 != null) {
+            console.log("Setting S1 moisture level");
+            moistureLevels[0] = latestRecord.s1
+          } else if (latestRecord.s2 != null) {
+            moistureLevels[1] = latestRecord.s2
+          } else if (latestRecord.s3 != null) {
+            moistureLevels[2] = latestRecord.s2
+          } else if (latestRecord.s4 != null) {
+            moistureLevels[3] = latestRecord.s2
+          } 
+
         }
 
         callback();
@@ -624,6 +647,11 @@ function sendToCS(gatewayId , type ) {
     //var cloudSensorIp = "cloudsensor.webfactional.com/HBwater/default/detail.json?gw=100001&no=50"
 
     var queue = "default";  // or "change"?
+
+
+    if ( gatewayId == "") {
+      return;
+    }
 
     // Create a binding object
     //
@@ -1875,7 +1903,7 @@ var showSites = ( function() {
 
 	                // Store the CloudSensor gateway id
 	                //
-	                if ( csgwid !== "" && csgwid !== sites[site].cs_gw_id ) {
+	                if ( csgwid !== sites[site].cs_gw_id ) {
 
                             console.log("Setting sites[site].cs_gw_id = " + csgwid);
 
@@ -4496,11 +4524,26 @@ var showHome = ( function() {
                 pname = isScheduled ? pidname( controller.settings.ps[i][0] ) : "",
                 rem = controller.settings.ps[i][1],
                 hasImage = sites[currentSite].images[i] ? true : false,
-                moistureLevel = "low";
+                moistureLevel = "none";
 
             // Fetch moisture level and reset image accordingly
             //
-            //if (controller.
+            if (moistureLevels[i] != null) {
+
+                if (moistureLevels[i] > 151)
+                  moistureLevel = "high";
+                else if (moistureLevels[i] > 148)
+                  moistureLevel = "med";
+                else if (moistureLevels[i] > 1)
+                  moistureLevel = "low";
+
+                console.log("Moisture " + i + " level = \"" + moistureLevel + " on value " + moistureLevels[i]);
+            }
+            else {
+
+                console.log("Moisture "+ i + " = id = " + moistureLevels[i]);
+            }
+            
 
             if ( controller.status[i] && rem > 0 ) {
                 addTimer( i, rem );
@@ -4847,6 +4890,23 @@ var showHome = ( function() {
                     } else {
                         card.find( ".station-settings" ).removeClass( "ui-icon-master" ).addClass( "ui-icon-gear" );
                     }
+
+                    // Update moisture level
+                    //
+                    var moistureLevel = "none";
+                    if (moistureLevels[i] != null) {
+
+                        if (moistureLevels[i] > 151)
+                          moistureLevel = "high";
+                        else if (moistureLevels[i] > 148)
+                          moistureLevel = "med";
+                        else if (moistureLevels[i] > 1)
+                          moistureLevel = "low";
+
+                        console.log("Moisture " + i + " level = \"" + moistureLevel + " on value " + moistureLevels[i]);
+                    }
+                    card.find(".moisture-level").removeClass("high mid low none").addClass(moistureLevel);
+
                     card.find( ".station-settings" ).data( {
                         um: hasMaster ? ( ( controller.stations.masop[parseInt( i / 8 )] & ( 1 << ( i % 8 ) ) ) ? 1 : 0 ) : undefined,
                         um2: hasMaster2 ? ( ( controller.stations.masop2[parseInt( i / 8 )] & ( 1 << ( i % 8 ) ) ) ? 1 : 0 ) : undefined,

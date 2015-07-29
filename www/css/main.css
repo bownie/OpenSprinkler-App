@@ -744,10 +744,13 @@ body, input, select, textarea, button, .ui-btn {
 .moisture-level {
     position: absolute;
     top: -3px;
-    left: 8%;
+    left: 10%;
     border: none;
 }
 
+.moisture-level.none:after {
+    background-color:#ffffff;
+}
 .moisture-level.low:after {
     background-color:#aaaacc;
 }
